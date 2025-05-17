@@ -10,6 +10,8 @@ renderer.setSize( window.innerWidth, window.innerHeight );
 document.body.appendChild( renderer.domElement );
 
 const controls = new OrbitControls( camera, renderer.domElement );
+// controls.autoRotate = true;
+controls.enableDamping = true;
 
 // Obtain metadata
 const panoId =  "bl3v0-ol5SonuMF_4ozgxQ";
@@ -60,8 +62,8 @@ for (let y = 0; y < nY; y++) {
         }
 
         let geometry = new THREE.SphereGeometry(
-            1, 32, 16,
-            start_x, width_x, start_y, width_y
+            10, 32, 16,
+            -start_x, -width_x, start_y, width_y
         );
 
         let loader = new THREE.TextureLoader();
@@ -73,14 +75,12 @@ for (let y = 0; y < nY; y++) {
             `panoId=${panoId}`
         );
         texture.colorSpace = THREE.SRGBColorSpace;
-        if ((x == nX-1) || (y == nY-1)) {
             texture.matrixAutoUpdate = false;
             let scale_x = (x == nX-1) ? width_x/slice_h : 1;
             let scale_y = (y == nY-1) ? width_y/slice_v : 1;
             let shift_y = (y == nY-1) ? (1-width_y/slice_v) : 0;
             console.log(x, y, scale_x, scale_y)
             texture.matrix.set(scale_x, 0, 0, 0, scale_y, shift_y, 0, 0, 1)
-        }
         console.log(texture);
         let material = new THREE.MeshBasicMaterial({
             map: texture,
@@ -96,6 +96,7 @@ camera.position.z = 5;
 controls.update();
 
 function animate() {
+    controls.update();
     renderer.render( scene, camera );
 }
 renderer.setAnimationLoop( animate );
