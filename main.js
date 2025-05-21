@@ -15,9 +15,19 @@ const controls = new OrbitControls( camera, renderer.domElement );
 controls.enableDamping = true;
 
 // Simple GUI
-var settings = {live: false};
+var settings = {
+    live: false,
+    api_key: "",
+    session: "",
+    zoom: 3
+};
 const gui = new GUI();
-gui.add(settings, "live");
+gui.remember(settings)
+let folder = gui.addFolder("Settings")
+folder.add(settings, "live");
+folder.add(settings, "zoom");
+folder.add(settings, "api_key");
+folder.add(settings, "session");
 
 // Get the current IRT pano
 const socket = new WebSocket(
@@ -31,13 +41,14 @@ socket.onmessage = async (event) => {
     const msg = JSON.parse(event.data);
     if (panoId == msg["pano"]) return;
 
-    panoId = msg["pano"];
-    if (settings.live) await show_pano();
+    if (!settings.live && panoId == "") {
+        panoId = msg["pano"];
+        await show_pano();
+    } else {
+        panoId = msg["pano"];
+        if (settings.live) await show_pano();
+    }
 }
-
-const API_KEY = "API_KEY"
-// https://developers.google.com/maps/documentation/tile/session_tokens
-const session = 'session';
 
 async function show_pano() {
     // Obtain metadata
@@ -45,14 +56,13 @@ async function show_pano() {
     // const panoId = "CAoSLEFGMVFpcE1fc2VYOHFCa3drZS1LSUVPS0QzVE52UWpWbjlVT1Z2OUZvaVBX";
     const meta_response = await fetch(
         "https://tile.googleapis.com/v1/streetview/metadata" +
-        `?session=${session}&key=${API_KEY}&` +
+        `?session=${settings['session']}&key=${settings['api_key']}&` +
         `panoId=${panoId}`
     )
     const metadata = await meta_response.json();
-    console.log(metadata);
 
     // Compute pano properties
-    const zoom = 3;
+    const zoom = settings["zoom"];
 
     const tileWidth = metadata["tileWidth"]
     const tileHeight = metadata["tileHeight"]
@@ -70,7 +80,6 @@ async function show_pano() {
     // this much pi per tile
     const slice_h = 2*Math.PI / (cropWidth/tileWidth)
     const slice_v = Math.PI / (cropHeight/tileHeight)
-    console.log(slice_h, cropWidth, tileWidth, cropWidth/tileWidth)
 
     // Clear the scene
     while(scene.children.length > 0){ 
@@ -102,7 +111,7 @@ async function show_pano() {
             let texture = loader.load(
                 "https://tile.googleapis.com/v1/streetview/tiles" +
                 `/${zoom}/${x}/${y}` +
-                `?session=${session}&key=${API_KEY}&` +
+                `?session=${settings['session']}&key=${settings['api_key']}&` +
                 `panoId=${panoId}`
             );
             texture.colorSpace = THREE.SRGBColorSpace;
@@ -110,9 +119,7 @@ async function show_pano() {
             let scale_x = (x == nX-1) ? width_x/slice_h : 1;
             let scale_y = (y == nY-1) ? width_y/slice_v : 1;
             let shift_y = (y == nY-1) ? (1-width_y/slice_v) : 0;
-            console.log(x, y, scale_x, scale_y)
             texture.matrix.set(scale_x, 0, 0, 0, scale_y, shift_y, 0, 0, 1)
-            console.log(texture);
             let material = new THREE.MeshBasicMaterial({
                 map: texture,
                 side: THREE.DoubleSide,
@@ -124,7 +131,7 @@ async function show_pano() {
     }
 }
 
-camera.position.z = 5;
+camera.position.z = 1;
 controls.update();
 
 function animate() {
