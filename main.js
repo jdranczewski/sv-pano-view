@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GUI } from 'dat.gui'
+import { VRButton } from 'three/addons/webxr/VRButton.js';
 
 // Create the scene, camera, and renderer
 const scene = new THREE.Scene();
@@ -18,7 +19,6 @@ controls.enableDamping = true;
 var settings = {
     live: false,
     api_key: "",
-    session: "",
     zoom: 3
 };
 const gui = new GUI();
@@ -27,7 +27,6 @@ let folder = gui.addFolder("Settings")
 folder.add(settings, "live");
 folder.add(settings, "zoom");
 folder.add(settings, "api_key");
-folder.add(settings, "session");
 
 // Get the current IRT pano
 const socket = new WebSocket(
@@ -50,13 +49,32 @@ socket.onmessage = async (event) => {
     }
 }
 
+let session = undefined;
 async function show_pano() {
+    // Establish a session
+    if (session === undefined) {
+        console.log("getting session token...")
+        const session_response = await fetch(`https://tile.googleapis.com/v1/createSession?key=${settings['api_key']}`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                "mapType": "streetview",
+                "language": "en-US",
+                "region": "US"
+            })
+        });
+        session = (await session_response.json()).session;
+        console.log("session token:", session)
+    }
+
     // Obtain metadata
     // const panoId =  "bl3v0-ol5SonuMF_4ozgxQ";
     // const panoId = "CAoSLEFGMVFpcE1fc2VYOHFCa3drZS1LSUVPS0QzVE52UWpWbjlVT1Z2OUZvaVBX";
     const meta_response = await fetch(
         "https://tile.googleapis.com/v1/streetview/metadata" +
-        `?session=${settings['session']}&key=${settings['api_key']}&` +
+        `?session=${session}&key=${settings['api_key']}&` +
         `panoId=${panoId}`
     )
     const metadata = await meta_response.json();
@@ -111,7 +129,7 @@ async function show_pano() {
             let texture = loader.load(
                 "https://tile.googleapis.com/v1/streetview/tiles" +
                 `/${zoom}/${x}/${y}` +
-                `?session=${settings['session']}&key=${settings['api_key']}&` +
+                `?session=${session}&key=${settings['api_key']}&` +
                 `panoId=${panoId}`
             );
             texture.colorSpace = THREE.SRGBColorSpace;
@@ -139,3 +157,10 @@ function animate() {
     renderer.render( scene, camera );
 }
 renderer.setAnimationLoop( animate );
+
+document.body.appendChild(
+    VRButton.createButton(
+        renderer
+    )
+);
+renderer.xr.enabled = true;
